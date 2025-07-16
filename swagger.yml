@@ -1,0 +1,879 @@
+openapi: 3.0.0
+info:
+  title: Roadtrip Planner API
+  version: 1.0.0
+  description: Roadtrip Planner API
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /api/login:
+    post:
+      operationId: loginUser
+      summary: Authenticate user and return access token along with username
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        x-codegen-request-body-name: credentials
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: admin@carbon-it.com
+                password:
+                  type: string
+                  example: password
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  username:
+                    type: string
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/logout:
+    post:
+      operationId: logoutUser
+      summary: Logs out the user
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        "401":
+          description: Missing access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Token is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/countries:
+    get:
+      operationId: getAllCountries
+      summary: Get all countries
+      description: Returns a list of all countries. Optionally, you can paginate the results.
+      tags:
+        - Countries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination (starts at 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: List of countries (optionally paginated)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Countries"
+                  - $ref: "#/components/schemas/PaginatedCountries"
+              examples:
+                NonPaginated:
+                  $ref: "#/components/examples/Countries"
+                Paginated:
+                  $ref: "#/components/examples/PaginatedCountries"
+        "400":
+          description: Invalid page or pageSize parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to fetch countries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/countries/name/{name}:
+    get:
+      operationId: getCountryByName
+      summary: Get countries by name with pagination
+      tags:
+        - Countries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Full or partial country name
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (starts from 1)
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Number of items per page for pagination
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+      responses:
+        "200":
+          description: Paginated list of countries matching the name
+          content:
+            application/json:
+              schema:
+                - $ref: "#/components/schemas/PaginatedCountries"
+              examples:
+                PaginatedCountries:
+                  - $ref: "#/components/examples/PaginatedCountries"
+
+        "400":
+          description: Missing, ambiguous, or invalid parameters (name or pagination)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Country not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to fetch country by name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/countries/codes:
+    get:
+      operationId: getCountriesByCodes
+      summary: Get countries by 3-letter codes
+      tags:
+        - Countries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: codes
+          in: query
+          required: true
+          description: Comma-separated list of ISO 3166-1 alpha-3 country codes (cca3) (e.g., "USA,FRA,BRA")
+          schema:
+            type: string
+            example: USA,FRA,BRA
+      responses:
+        "200":
+          description: List of countries matching the codes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Countries"
+        "400":
+          description: Invalid codes query parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Countries not found for provided codes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to fetch countries by codes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/countries/codes/{code}:
+    get:
+      operationId: getCountryByCode
+      summary: Get a country by 3-letter code
+      tags:
+        - Countries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: ISO 3166-1 alpha-3 country code (cca3) (e.g., "USA")
+          schema:
+            type: string
+            example: USA
+      responses:
+        "200":
+          description: Country matching the code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Country"
+        "400":
+          description: Invalid code parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid code parameter
+        "404":
+          description: Country not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to fetch country by code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/roadtrip:
+    get:
+      operationId: getRoadtrip
+      summary: Get roadtrip
+      tags:
+        - Roadtrip
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The current roadtrip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadtripWithOrder"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateRoadtrip
+      summary: Save the roadtrip
+      tags:
+        - Roadtrip
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewRoadtrip"
+      responses:
+        "204":
+          description: Roadtrip updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Roadtrip"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/roadtrip/countries:
+    get:
+      operationId: getRoadtripCountries
+      summary: Get all roadtrip countries
+      tags:
+        - Roadtrip
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of roadtrip countries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    cca3:
+                      type: string
+                      example: "FRA"
+                    order:
+                      type: number
+                      example: 1
+
+    post:
+      operationId: addRoadtripCountry
+      summary: Add a new roadtrip country
+      tags:
+        - Roadtrip
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        x-codegen-request-body-name: country
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cca3:
+                  type: string
+                  example: "FRA"
+              required: [cca3]
+      responses:
+        "201":
+          description: Country added successfully
+        "400":
+          description: Invalid country cca3 id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Country already exists in roadtrip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/roadtrip/countries/{cca3}:
+    delete:
+      operationId: deleteRoadtripCountry
+      summary: Delete a roadtrip country
+      tags:
+        - Roadtrip
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: cca3
+          required: true
+          schema:
+            type: string
+          description: The CCA3 ID of the country to delete
+      responses:
+        "204":
+          description: Country deleted successfully
+        "404":
+          description: Country not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+    Roadtrip:
+      type: object
+      properties:
+        countries:
+          type: array
+          items:
+            type: string
+            example: "FRA"
+        # startDate:
+        #   type: string
+        #   format: date-time
+        #   nullable: true
+        # endDate:
+        #   type: string
+        #   format: date-time
+        #   nullable: true
+
+    RoadtripWithOrder:
+      type: object
+      properties:
+        countries:
+          type: array
+          items:
+            type: object
+            properties:
+              cca3:
+                type: string
+                example: "FRA"
+              order:
+                type: number
+                example: 1
+        # startDate:
+        #   type: string
+        #   format: date-time
+        #   nullable: true
+        # endDate:
+        #   type: string
+        #   format: date-time
+        #   nullable: true
+
+    NewRoadtrip:
+      type: object
+      required:
+        - countries
+        # - startDate
+        # - endDate
+      properties:
+        countries:
+          type: array
+          items:
+            type: string
+            example: "FRA"
+        # startDate:
+        #   type: string
+        #   format: date-time
+        #   nullable: true
+        #   example: "2023-10-01T00:00:00Z"
+        # endDate:
+        #   type: string
+        #   format: date-time
+        #   nullable: true
+        #   example: "2023-10-31T00:00:00Z"
+
+    CountryName:
+      type: object
+      properties:
+        common:
+          type: string
+        official:
+          type: string
+      required:
+        - common
+        - official
+
+    Currency:
+      type: object
+      properties:
+        name:
+          type: string
+        symbol:
+          type: string
+      required:
+        - name
+        - symbol
+
+    Country:
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/CountryName"
+        cca3:
+          type: string
+        independent:
+          type: boolean
+        status:
+          type: string
+        unMember:
+          type: boolean
+        currencies:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/Currency"
+        capital:
+          type: array
+          items:
+            type: string
+        capitalInfo:
+          type: object
+          properties:
+            latlng:
+              type: array
+              items:
+                type: number
+              minItems: 2
+              maxItems: 2
+        region:
+          type: string
+        subregion:
+          type: string
+        continents:
+          type: array
+          items:
+            type: string
+        languages:
+          type: object
+          additionalProperties:
+            type: string
+        translations:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/CountryName"
+        latlng:
+          type: array
+          items:
+            type: number
+        landlocked:
+          type: boolean
+        borders:
+          type: array
+          items:
+            type: string
+        area:
+          type: number
+        flag:
+          type: string
+        flags:
+          type: object
+          properties:
+            svg:
+              type: string
+            png:
+              type: string
+            alt:
+              type: string
+        coatOfArms:
+          type: object
+          properties:
+            svg:
+              type: string
+            png:
+              type: string
+        population:
+          type: integer
+        maps:
+          type: object
+          properties:
+            googleMaps:
+              type: string
+            openStreetMaps:
+              type: string
+        postalCode:
+          type: object
+          properties:
+            format:
+              type: string
+              nullable: true
+            regex:
+              type: string
+              nullable: true
+        startOfWeek:
+          type: string
+        timezones:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - cca3
+        - independent
+        - status
+        - unMember
+        - currencies
+        - capital
+        - capitalInfo
+        - region
+        - subregion
+        - continents
+        - languages
+        - translations
+        - latlng
+        - landlocked
+        - borders
+        - area
+        - flag
+        - flags
+        - coatOfArms
+        - population
+        - maps
+        - postalCode
+        - startOfWeek
+        - timezones
+      example:
+        name:
+          common: France
+          official: French Republic
+        cca3: FRA
+        independent: true
+        status: officially-assigned
+        unMember: true
+        currencies:
+          EUR:
+            name: Euro
+            symbol: "€"
+        capital: [Paris]
+        capitalInfo:
+          latlng: [48.87, 2.33]
+        region: Europe
+        subregion: Western Europe
+        continents: [Europe]
+        languages:
+          fra: French
+        translations:
+          ara:
+            official: الجمهورية الفرنسية
+            common: فرنسا
+          deu:
+            official: Französische Republik
+            common: Frankreich
+        latlng: [46, 2]
+        landlocked: false
+        borders: [AND, BEL, DEU, ITA, LUX, MCO, ESP, CHE]
+        area: 551695
+        flag: "🇫🇷"
+        flags:
+          svg: https://flagcdn.com/fr.svg
+          png: https://flagcdn.com/w320/fr.png
+          alt: The flag of France is composed of three equal vertical bands of blue, white and red.
+        coatOfArms:
+          svg: https://mainfacts.com/media/images/coats_of_arms/fr.svg
+          png: https://mainfacts.com/media/images/coats_of_arms/fr.png
+        population: 67391582
+        maps:
+          googleMaps: https://goo.gl/maps/g7QxxSFsWyTPKuzd7
+          openStreetMaps: https://www.openstreetmap.org/relation/1403916
+        postalCode:
+          format: "#####"
+          regex: "^(\\d{5})$"
+        startOfWeek: monday
+        timezones:
+          - UTC-10:00
+          - UTC-09:30
+          - UTC-09:00
+          - UTC-08:00
+          - UTC-04:00
+          - UTC-03:00
+          - UTC+01:00
+          - UTC+02:00
+          - UTC+03:00
+          - UTC+04:00
+          - UTC+05:00
+          - UTC+10:00
+          - UTC+11:00
+          - UTC+12:00
+
+    Countries:
+      type: array
+      items:
+        $ref: "#/components/schemas/Country"
+
+    PaginatedCountries:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of countries
+          example: 250
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        pageSize:
+          type: integer
+          description: Number of countries per page
+          example: 10
+        totalPages:
+          type: integer
+          description: Total number of pages
+        data:
+          $ref: "#/components/schemas/Countries"
+
+  examples:
+    Countries:
+      summary: Full list of countries
+      value:
+        - name:
+            common: France
+            official: French Republic
+          cca3: FRA
+          independent: true
+          status: officially-assigned
+          unMember: true
+          currencies:
+            EUR:
+              name: Euro
+              symbol: "€"
+          capital: [Paris]
+          capitalInfo:
+            latlng: [48.87, 2.33]
+          region: Europe
+          subregion: Western Europe
+          continents: [Europe]
+          languages:
+            fra: French
+          translations:
+            deu:
+              official: Französische Republik
+              common: Frankreich
+          latlng: [46, 2]
+          landlocked: false
+          borders: [AND, BEL]
+          area: 551695
+          flag: "🇫🇷"
+          flags:
+            svg: https://flagcdn.com/fr.svg
+            png: https://flagcdn.com/w320/fr.png
+            alt: Flag of France
+          coatOfArms:
+            svg: https://mainfacts.com/media/images/coats_of_arms/fr.svg
+            png: https://mainfacts.com/media/images/coats_of_arms/fr.png
+          population: 67391582
+          maps:
+            googleMaps: https://goo.gl/maps/g7QxxSFsWyTPKuzd7
+            openStreetMaps: https://www.openstreetmap.org/relation/1403916
+          postalCode:
+            format: "#####"
+            regex: "^(\\d{5})$"
+          startOfWeek: monday
+          timezones: [UTC+01:00]
+
+    PaginatedCountries:
+      summary: Paginated list of countries
+      value:
+        total: 250
+        page: 1
+        pageSize: 2
+        totalPages: 125
+        countries:
+          - name:
+              common: France
+              official: French Republic
+            cca3: FRA
+            independent: true
+            status: officially-assigned
+            unMember: true
+            currencies:
+              EUR:
+                name: Euro
+                symbol: "€"
+            capital: [Paris]
+            capitalInfo:
+              latlng: [48.87, 2.33]
+            region: Europe
+            subregion: Western Europe
+            continents: [Europe]
+            languages:
+              fra: French
+            translations:
+              deu:
+                official: Französische Republik
+                common: Frankreich
+            latlng: [46, 2]
+            landlocked: false
+            borders: [AND, BEL]
+            area: 551695
+            flag: "🇫🇷"
+            flags:
+              svg: https://flagcdn.com/fr.svg
+              png: https://flagcdn.com/w320/fr.png
+              alt: Flag of France
+            coatOfArms:
+              svg: https://mainfacts.com/media/images/coats_of_arms/fr.svg
+              png: https://mainfacts.com/media/images/coats_of_arms/fr.png
+            population: 67391582
+            maps:
+              googleMaps: https://goo.gl/maps/g7QxxSFsWyTPKuzd7
+              openStreetMaps: https://www.openstreetmap.org/relation/1403916
+            postalCode:
+              format: "#####"
+              regex: "^(\\d{5})$"
+            startOfWeek: monday
+            timezones: [UTC+01:00]
+          - name:
+              common: Germany
+              official: Federal Republic of Germany
+            cca3: DEU
+            independent: true
+            status: officially-assigned
+            unMember: true
+            currencies:
+              EUR:
+                name: Euro
+                symbol: "€"
+            capital: [Berlin]
+            capitalInfo:
+              latlng: [52.52, 13.405]
+            region: Europe
+            subregion: Central Europe
+            continents: [Europe]
+            languages:
+              deu: German
+            translations:
+              fra:
+                official: République fédérale d'Allemagne
+                common: Allemagne
+            latlng: [51, 9]
+            landlocked: false
+            borders: [AUT, BEL]
+            area: 357114
+            flag: "🇩🇪"
+            flags:
+              svg: https://flagcdn.com/de.svg
+              png: https://flagcdn.com/w320/de.png
+              alt: Flag of Germany
+            coatOfArms:
+              svg: https://mainfacts.com/media/images/coats_of_arms/de.svg
+              png: https://mainfacts.com/media/images/coats_of_arms/de.png
+            population: 83240525
+            maps:
+              googleMaps: https://goo.gl/maps/mD9FBMq1nvXUBrkv6
+              openStreetMaps: https://www.openstreetmap.org/relation/51477
+            postalCode:
+              format: "#####"
+              regex: "^(\\d{5})$"
+            startOfWeek: monday
+            timezones: [UTC+01:00]
