@@ -33,6 +33,7 @@ PASSWORD=your_password
 ```
 
 `LOGIN` et `PASSWORD` étant les variables qui vous permettront de vous authentifier à l'API.
+`ACCESS_TOKEN_SECRET` peut prendre n'importe quelle valeur. Il sera transmis au front au moment du login et devra être transmis dans le header `Authorization` à chaque appel.
 
 ## ▶️ Exécuter le serveur
 
