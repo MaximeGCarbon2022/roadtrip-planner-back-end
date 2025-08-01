@@ -10,7 +10,7 @@ paths:
   /api/login:
     post:
       operationId: loginUser
-      summary: Authenticate user and return access token along with username
+      summary: Authenticate user and return access token along with login
       tags:
         - Authentication
       requestBody:
@@ -21,10 +21,10 @@ paths:
             schema:
               type: object
               required:
-                - username
+                - login
                 - password
               properties:
-                username:
+                login:
                   type: string
                   example: admin@carbon-it.com
                 password:
