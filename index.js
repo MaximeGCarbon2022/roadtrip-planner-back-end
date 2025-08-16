@@ -15,8 +15,18 @@ import { readRoadtrip, writeRoadtrip } from "./fileStorage.js";
 import Roadtrip from "./model/roadtrip.model.js";
 import randomizeOrder from "./randomizer.js";
 
-const file = readFileSync("./swagger.yml", "utf8");
-const swaggerSpec = parse(file);
+let swaggerSpec = null;
+
+try {
+  const file = readFileSync(join(import.meta.dirname, "swagger.yml"), "utf8");
+  swaggerSpec = parse(file);
+} catch (error) {
+  console.warn("swagger.yml not found, Swagger UI disabled");
+}
+
+if (swaggerSpec) {
+  app.use("/api-docs", serve, setup(swaggerSpec, { explorer: true }));
+}
 
 const app = express();
 
