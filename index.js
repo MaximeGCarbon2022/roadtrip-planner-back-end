@@ -1,19 +1,23 @@
 import bodyParser from "body-parser";
 import cors from "cors";
 import express from "express";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { readFileSync } from "fs";
 import webTokens from "jsonwebtoken";
 import { join } from "path";
 import { serve, setup } from "swagger-ui-express";
 import { parse } from "yaml";
-const { json } = bodyParser;
-const { sign, verify } = webTokens;
 
 import { readFile } from "fs/promises";
 import { countryFields } from "./constants.js";
 import { readRoadtrip, writeRoadtrip } from "./fileStorage.js";
 import Roadtrip from "./model/roadtrip.model.js";
 import randomizeOrder from "./randomizer.js";
+import { createRequire } from "module";
+
+const { json } = bodyParser;
+const { sign, verify } = webTokens;
+
+const app = express();
 
 let swaggerSpec = null;
 
@@ -24,13 +28,6 @@ try {
   console.warn("swagger.yml not found, Swagger UI disabled");
 }
 
-if (swaggerSpec) {
-  app.use("/api-docs", serve, setup(swaggerSpec, { explorer: true }));
-}
-
-const app = express();
-
-const dataFilePath = join(import.meta.dirname, "roadtrip.json");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const LOGIN = process.env.LOGIN;
 const PASSWORD = process.env.PASSWORD;
@@ -50,18 +47,13 @@ if (!PASSWORD) {
   process.exit(1);
 }
 
-// Ensure the data file exists
-if (!existsSync(dataFilePath)) {
-  writeFileSync(
-    dataFilePath,
-    JSON.stringify(new Roadtrip([], null, null), null, 2),
-    "utf8"
-  );
-  console.log("roadtrip.json file created with initial empty roadtrip.");
-}
-
 app.use(json());
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://road-trip-front.vercel.app",
+    credentials: true,
+  })
+);
 
 // ---------- Middleware ---------- //
 
@@ -99,12 +91,12 @@ app.post("/api/logout", authenticateToken, (req, res) => {
 
 // ---------- Country API Routes ---------- //
 
+const require = createRequire(import.meta.url);
+const countries = require("./countries.json");
+
 app.get("/api/countries", authenticateToken, async (req, res) => {
   try {
-    const data = await readFile(
-      join(import.meta.dirname, "countries.json"),
-      "utf8"
-    ).then((fileContent) => JSON.parse(fileContent));
+    const data = countries;
 
     const page = parseInt(req.query.page);
     const pageSize = parseInt(req.query.pageSize);
@@ -132,11 +124,11 @@ app.get("/api/countries", authenticateToken, async (req, res) => {
 
     res.json(data);
   } catch (err) {
+    console.error("Error with countries:", err);
     res.status(500).json({ message: "Failed to fetch countries" });
   }
 });
 
-// Paginated countries by name using URL parameter
 app.get("/api/countries/name/:name", authenticateToken, async (req, res) => {
   const { name } = req.params;
   if (!name) return res.status(400).json({ message: "Missing name parameter" });
@@ -186,7 +178,6 @@ app.get("/api/countries/name/:name", authenticateToken, async (req, res) => {
   }
 });
 
-// Country by codes cca3 using URL parameter
 app.get("/api/countries/codes", authenticateToken, async (req, res) => {
   const { codes } = req.query;
   if (!codes) {
@@ -229,7 +220,6 @@ app.get("/api/countries/codes", authenticateToken, async (req, res) => {
   }
 });
 
-// Country by code cca3 using URL parameter
 app.get("/api/countries/codes/:code", authenticateToken, async (req, res) => {
   const { code } = req.params;
   if (!code || typeof code !== "string" || code.length !== 3) {
@@ -254,7 +244,6 @@ app.get("/api/countries/codes/:code", authenticateToken, async (req, res) => {
 
 // ---------- Roadtrip API Routes ---------- //
 
-// Get the roadtrip
 app.get("/api/roadtrip", authenticateToken, (req, res) => {
   const roadtrip = readRoadtrip();
   const randomizedCountries = randomizeOrder(roadtrip.countries);
@@ -262,28 +251,22 @@ app.get("/api/roadtrip", authenticateToken, (req, res) => {
   res.json(new Roadtrip(randomizedCountries));
 });
 
-// Save the roadtrip
 app.put("/api/roadtrip", authenticateToken, (req, res) => {
   const { countries } = req.body;
   if (!Array.isArray(countries)) {
     return res.status(400).json({ message: "Invalid countries array." });
   }
 
-  const roadtrip = new Roadtrip(
-    countries
-    // startDate, endDate
-  );
+  const roadtrip = new Roadtrip(countries);
   writeRoadtrip(roadtrip);
   res.status(200).json(roadtrip);
 });
 
-// Get all roadtrip countries
 app.get("/api/roadtrip/countries", authenticateToken, (_req, res) => {
   const data = readRoadtrip();
   res.json(randomizeOrder(data.countries));
 });
 
-// Add a new roadtrip country
 app.post("/api/roadtrip/countries", authenticateToken, (req, res) => {
   try {
     const newCountryId = req.body.cca3;
@@ -313,7 +296,6 @@ app.post("/api/roadtrip/countries", authenticateToken, (req, res) => {
   }
 });
 
-// Delete a roadtrip country by ID
 app.delete("/api/roadtrip/countries/:cca3", authenticateToken, (req, res) => {
   const { cca3 } = req.params;
 
@@ -332,8 +314,9 @@ app.delete("/api/roadtrip/countries/:cca3", authenticateToken, (req, res) => {
 
 // ---------- Swagger UI ---------- //
 
-app.use("/api-docs", serve, setup(swaggerSpec, { explorer: true }));
-
+if (swaggerSpec) {
+  app.use("/api-docs", serve, setup(swaggerSpec, { explorer: true }));
+}
 // ---------- Start Server ---------- //
 
 app.listen(PORT, () => {

@@ -1,18 +1,13 @@
-import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
 import Roadtrip from "./model/roadtrip.model.js";
 
-const dataFilePath = join(import.meta.dirname, "roadtrip.json");
+let inMemoryRoadtrip = { countries: [] };
 
 function readRoadtrip() {
   try {
-    const jsonData = readFileSync(dataFilePath, "utf8");
-    const countries = JSON.parse(jsonData);
-
-    return new Roadtrip(countries);
+    return new Roadtrip(inMemoryRoadtrip.countries);
   } catch (err) {
-    console.error("Error reading data file:", err);
-    return {};
+    console.error("Error reading roadtrip data:", err);
+    return new Roadtrip([]);
   }
 }
 
@@ -22,9 +17,10 @@ function writeRoadtrip(data) {
       throw new Error("Data must be an instance of Roadtrip");
     }
 
-    writeFileSync(dataFilePath, JSON.stringify(data.countries, null, 2));
+    inMemoryRoadtrip.countries = [...data.countries];
+    console.log("Roadtrip saved in memory:", inMemoryRoadtrip.countries);
   } catch (err) {
-    console.error("Error writing to data file:", err);
+    console.error("Error saving roadtrip data:", err);
   }
 }
 
